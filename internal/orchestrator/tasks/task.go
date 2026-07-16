@@ -17,6 +17,7 @@ import (
 type RepoOrchestrator interface {
 	UnlockIfAutoEnabled(ctx context.Context) error
 	Backup(ctx context.Context, plan *v1.Plan, dryRun bool, progressCallback func(event *restic.BackupProgressEntry)) (*restic.BackupProgressEntry, error)
+	Diff(ctx context.Context, fromSnapshot string, toSnapshot string) ([]*v1.DiffEntry, error)
 	Forget(ctx context.Context, policy *v1.RetentionPolicy, opts ...restic.GenericOption) ([]*v1.ResticSnapshot, error)
 	ForgetSnapshot(ctx context.Context, snapshotId string) error
 	Prune(ctx context.Context, output io.Writer) error

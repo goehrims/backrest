@@ -25,7 +25,7 @@ import {
   MenuContent,
   MenuItem,
 } from "../../components/ui/menu";
-import { FiFileText, FiMoreVertical, FiTrash2, FiX } from "react-icons/fi";
+import { FiFileText, FiMoreVertical, FiTrash2, FiX, FiList } from "react-icons/fi";
 import { ProgressCircle } from "../../components/ui/progress-circle";
 import { ProgressBar, ProgressRoot } from "../../components/ui/progress";
 import { toaster } from "../../components/ui/toaster";
@@ -46,6 +46,8 @@ import {
 import {
   CancelOperationRequestSchema,
   ClearHistoryRequestSchema,
+  ListSnapshotsRequestSchema,
+  SnapshotDiffRequestSchema,
 } from "../../../gen/ts/v1/service_pb";
 import { backrestService } from "../../api/client";
 import { useShowModal } from "../../components/common/ModalManager";
@@ -175,6 +177,66 @@ export const OperationRow = ({
     );
   };
 
+  const doShowChangedFiles = async () => {
+    if (!operation.snapshotId || !operation.id) {
+      return;
+    }
+
+    const previousSnapshots = await backrestService.listSnapshots(
+      create(ListSnapshotsRequestSchema, {
+        repoId: currentRepoId,
+        planId: operation.planId,
+      }),
+    );
+
+    const snapshots = previousSnapshots.snapshots ?? [];
+    const currentIndex = snapshots.findIndex((s) => s.id === operation.snapshotId);
+    const previousSnapshot = snapshots[currentIndex - 1];
+    if (!previousSnapshot?.id) {
+      alerts.error("No previous snapshot available for diff.");
+      return;
+    }
+
+    try {
+      const resp = await backrestService.diffSnapshots(
+        create(SnapshotDiffRequestSchema, {
+          repoId: currentRepoId,
+          fromSnapshotId: previousSnapshot.id,
+          toSnapshotId: operation.snapshotId,
+        }),
+      );
+
+      showModal(
+        <FormModal
+          size="large"
+          title={`Changed files for ${normalizeSnapshotId(operation.snapshotId)}`}
+          isOpen={true}
+          onClose={() => showModal(null)}
+          footer={null}
+        >
+          <Stack gap={3}>
+            {resp.entries?.length ? (
+              <Box>
+                {resp.entries.map((entry, idx) => (
+                  <Box key={idx} p={2} borderWidth="1px" borderRadius="md" mb={2}>
+                    <Text fontFamily="mono">{entry.path}</Text>
+                    <Text fontSize="sm" color="fg.muted">
+                      {entry.changeType}
+                    </Text>
+                  </Box>
+                ))}
+              </Box>
+            ) : (
+              <Text color="fg.muted">No changed files found.</Text>
+            )}
+          </Stack>
+        </FormModal>,
+      );
+    } catch (e: any) {
+      alerts.error("Failed to load changed files: " + e.message);
+    }
+  };
+
   let details: string = "";
   if (operation.status !== OperationStatus.STATUS_SUCCESS) {
     details = nameForStatus(operation.status);
@@ -255,14 +317,27 @@ export const OperationRow = ({
       expandedBodyItems.push("details");
     }
     const backupOp = operation.op.value;
+    const showChangedFilesButton =
+      operation.status === OperationStatus.STATUS_SUCCESS && operation.snapshotId;
+
     bodyItems.push({
       key: "details",
       label: m.op_row_backup_details(),
       children: (
-        <BackupOperationStatus
-          status={backupOp.lastStatus}
-          dryRun={backupOp.dryRun}
-        />
+        <Stack gap={3}>
+          <BackupOperationStatus
+            status={backupOp.lastStatus}
+            dryRun={backupOp.dryRun}
+          />
+          {showChangedFilesButton ? (
+            <Button size="sm" variant="outline" onClick={doShowChangedFiles}>
+              <FiList />
+              <Box as="span" ml={2}>
+                Show changed files
+              </Box>
+            </Button>
+          ) : null}
+        </Stack>
       ),
     });
 

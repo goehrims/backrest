@@ -28,6 +28,11 @@ var ErrBackupFailed = errors.New("backup failed")
 var ErrRestoreFailed = errors.New("restore failed")
 var ErrRepoNotFound = errors.New("repo does not exist")
 
+type DiffEntry struct {
+	Path       string
+	ChangeType string
+}
+
 type Repo struct {
 	cmd string
 	uri string
@@ -336,6 +341,45 @@ func (r *Repo) Restore(ctx context.Context, snapshot string, callback func(*Rest
 	return runCommandWithProgress(ctx, r, args, callback, ErrRestoreFailed, opts...)
 }
 
+func parseDiffOutput(output string) []DiffEntry {
+	var entries []DiffEntry
+	for _, rawLine := range strings.Split(output, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" || strings.HasPrefix(line, "Files changed:") {
+			continue
+		}
+		if len(line) < 2 {
+			continue
+		}
+		changeType := line[:1]
+		path := strings.TrimSpace(line[1:])
+		if path == "" {
+			continue
+		}
+		switch changeType {
+		case "M":
+			entries = append(entries, DiffEntry{Path: path, ChangeType: "modified"})
+		case "+":
+			entries = append(entries, DiffEntry{Path: path, ChangeType: "added"})
+		case "-":
+			entries = append(entries, DiffEntry{Path: path, ChangeType: "removed"})
+		}
+	}
+	return entries
+}
+
+func (r *Repo) Diff(ctx context.Context, fromSnapshot string, toSnapshot string, opts ...GenericOption) ([]DiffEntry, error) {
+	args := []string{"diff", fromSnapshot, toSnapshot}
+	output := bytes.NewBuffer(nil)
+	errorCollector := errorMessageCollector{}
+	cmd := r.commandWithContext(ctx, args, opts...)
+	r.handleOutput(cmd, withStdOutTo(output), withAllTo(&errorCollector), withLogWriterFromContext(ctx))
+	if err := cmd.Run(); err != nil {
+		return nil, errorCollector.AddCmdOutputToError(cmd, err)
+	}
+	return parseDiffOutput(output.String()), nil
+}
+
 func (r *Repo) Snapshots(ctx context.Context, opts ...GenericOption) ([]*Snapshot, error) {
 
 	var snapshots []*Snapshot
@@ -378,7 +422,6 @@ func (r *Repo) Forget(ctx context.Context, policy *RetentionPolicy, opts ...Gene
 
 	return merged, nil
 }
-
 
 func (r *Repo) ForgetSnapshot(ctx context.Context, snapshotId string, opts ...GenericOption) error {
 	args := []string{"forget", "--json", snapshotId}

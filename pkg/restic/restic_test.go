@@ -18,6 +18,32 @@ import (
 	"github.com/garethgeorge/backrest/test/helpers"
 )
 
+func TestParseDiffOutput(t *testing.T) {
+	t.Parallel()
+
+	output := `M  /docs/readme.txt
++  /docs/new.txt
+-  /docs/old.txt
+Files changed: 3`
+
+	entries := parseDiffOutput(output)
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 diff entries, got %d", len(entries))
+	}
+
+	want := []DiffEntry{
+		{Path: "/docs/readme.txt", ChangeType: "modified"},
+		{Path: "/docs/new.txt", ChangeType: "added"},
+		{Path: "/docs/old.txt", ChangeType: "removed"},
+	}
+
+	for i, entry := range entries {
+		if entry.Path != want[i].Path || entry.ChangeType != want[i].ChangeType {
+			t.Fatalf("entry %d = %+v, want %+v", i, entry, want[i])
+		}
+	}
+}
+
 func TestResticInit(t *testing.T) {
 	t.Parallel()
 	repo := t.TempDir()

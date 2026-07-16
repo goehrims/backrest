@@ -16,6 +16,9 @@ type fakeRepoOrchestrator struct {
 	backupResult *restic.BackupProgressEntry
 	backupErr    error
 
+	diffResult []*v1.DiffEntry
+	diffErr    error
+
 	forgetResult []*v1.ResticSnapshot
 	forgetErr    error
 
@@ -49,6 +52,10 @@ func (f *fakeRepoOrchestrator) Backup(ctx context.Context, plan *v1.Plan, dryRun
 		cb(f.backupResult)
 	}
 	return f.backupResult, f.backupErr
+}
+
+func (f *fakeRepoOrchestrator) Diff(ctx context.Context, fromSnapshot string, toSnapshot string) ([]*v1.DiffEntry, error) {
+	return f.diffResult, f.diffErr
 }
 
 func (f *fakeRepoOrchestrator) Forget(ctx context.Context, policy *v1.RetentionPolicy, opts ...restic.GenericOption) ([]*v1.ResticSnapshot, error) {

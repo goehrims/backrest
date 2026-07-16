@@ -58,6 +58,8 @@ const (
 	// BackrestListSnapshotFilesProcedure is the fully-qualified name of the Backrest's
 	// ListSnapshotFiles RPC.
 	BackrestListSnapshotFilesProcedure = "/v1.Backrest/ListSnapshotFiles"
+	// BackrestDiffSnapshotsProcedure is the fully-qualified name of the Backrest's DiffSnapshots RPC.
+	BackrestDiffSnapshotsProcedure = "/v1.Backrest/DiffSnapshots"
 	// BackrestBackupProcedure is the fully-qualified name of the Backrest's Backup RPC.
 	BackrestBackupProcedure = "/v1.Backrest/Backup"
 	// BackrestDoRepoTaskProcedure is the fully-qualified name of the Backrest's DoRepoTask RPC.
@@ -99,6 +101,7 @@ type BackrestClient interface {
 	GetOperations(context.Context, *connect.Request[v1.GetOperationsRequest]) (*connect.Response[v1.OperationList], error)
 	ListSnapshots(context.Context, *connect.Request[v1.ListSnapshotsRequest]) (*connect.Response[v1.ResticSnapshotList], error)
 	ListSnapshotFiles(context.Context, *connect.Request[v1.ListSnapshotFilesRequest]) (*connect.Response[v1.ListSnapshotFilesResponse], error)
+	DiffSnapshots(context.Context, *connect.Request[v1.SnapshotDiffRequest]) (*connect.Response[v1.SnapshotDiffResponse], error)
 	// Backup schedules a backup operation. It accepts a plan id and returns empty if the task is enqueued.
 	Backup(context.Context, *connect.Request[v1.BackupRequest]) (*connect.Response[emptypb.Empty], error)
 	// DoRepoTask schedules a repo task. It accepts a repo id and a task type and returns the scheduled operation's ID.
@@ -197,6 +200,12 @@ func NewBackrestClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(backrestMethods.ByName("ListSnapshotFiles")),
 			connect.WithClientOptions(opts...),
 		),
+		diffSnapshots: connect.NewClient[v1.SnapshotDiffRequest, v1.SnapshotDiffResponse](
+			httpClient,
+			baseURL+BackrestDiffSnapshotsProcedure,
+			connect.WithSchema(backrestMethods.ByName("DiffSnapshots")),
+			connect.WithClientOptions(opts...),
+		),
 		backup: connect.NewClient[v1.BackupRequest, emptypb.Empty](
 			httpClient,
 			baseURL+BackrestBackupProcedure,
@@ -284,6 +293,7 @@ type backrestClient struct {
 	getOperations        *connect.Client[v1.GetOperationsRequest, v1.OperationList]
 	listSnapshots        *connect.Client[v1.ListSnapshotsRequest, v1.ResticSnapshotList]
 	listSnapshotFiles    *connect.Client[v1.ListSnapshotFilesRequest, v1.ListSnapshotFilesResponse]
+	diffSnapshots        *connect.Client[v1.SnapshotDiffRequest, v1.SnapshotDiffResponse]
 	backup               *connect.Client[v1.BackupRequest, emptypb.Empty]
 	doRepoTask           *connect.Client[v1.DoRepoTaskRequest, v1.ScheduleTaskResponse]
 	forget               *connect.Client[v1.ForgetRequest, v1.ScheduleTaskResponse]
@@ -346,6 +356,11 @@ func (c *backrestClient) ListSnapshots(ctx context.Context, req *connect.Request
 // ListSnapshotFiles calls v1.Backrest.ListSnapshotFiles.
 func (c *backrestClient) ListSnapshotFiles(ctx context.Context, req *connect.Request[v1.ListSnapshotFilesRequest]) (*connect.Response[v1.ListSnapshotFilesResponse], error) {
 	return c.listSnapshotFiles.CallUnary(ctx, req)
+}
+
+// DiffSnapshots calls v1.Backrest.DiffSnapshots.
+func (c *backrestClient) DiffSnapshots(ctx context.Context, req *connect.Request[v1.SnapshotDiffRequest]) (*connect.Response[v1.SnapshotDiffResponse], error) {
+	return c.diffSnapshots.CallUnary(ctx, req)
 }
 
 // Backup calls v1.Backrest.Backup.
@@ -420,6 +435,7 @@ type BackrestHandler interface {
 	GetOperations(context.Context, *connect.Request[v1.GetOperationsRequest]) (*connect.Response[v1.OperationList], error)
 	ListSnapshots(context.Context, *connect.Request[v1.ListSnapshotsRequest]) (*connect.Response[v1.ResticSnapshotList], error)
 	ListSnapshotFiles(context.Context, *connect.Request[v1.ListSnapshotFilesRequest]) (*connect.Response[v1.ListSnapshotFilesResponse], error)
+	DiffSnapshots(context.Context, *connect.Request[v1.SnapshotDiffRequest]) (*connect.Response[v1.SnapshotDiffResponse], error)
 	// Backup schedules a backup operation. It accepts a plan id and returns empty if the task is enqueued.
 	Backup(context.Context, *connect.Request[v1.BackupRequest]) (*connect.Response[emptypb.Empty], error)
 	// DoRepoTask schedules a repo task. It accepts a repo id and a task type and returns the scheduled operation's ID.
@@ -512,6 +528,12 @@ func NewBackrestHandler(svc BackrestHandler, opts ...connect.HandlerOption) (str
 		BackrestListSnapshotFilesProcedure,
 		svc.ListSnapshotFiles,
 		connect.WithSchema(backrestMethods.ByName("ListSnapshotFiles")),
+		connect.WithHandlerOptions(opts...),
+	)
+	backrestDiffSnapshotsHandler := connect.NewUnaryHandler(
+		BackrestDiffSnapshotsProcedure,
+		svc.DiffSnapshots,
+		connect.WithSchema(backrestMethods.ByName("DiffSnapshots")),
 		connect.WithHandlerOptions(opts...),
 	)
 	backrestBackupHandler := connect.NewUnaryHandler(
@@ -608,6 +630,8 @@ func NewBackrestHandler(svc BackrestHandler, opts ...connect.HandlerOption) (str
 			backrestListSnapshotsHandler.ServeHTTP(w, r)
 		case BackrestListSnapshotFilesProcedure:
 			backrestListSnapshotFilesHandler.ServeHTTP(w, r)
+		case BackrestDiffSnapshotsProcedure:
+			backrestDiffSnapshotsHandler.ServeHTTP(w, r)
 		case BackrestBackupProcedure:
 			backrestBackupHandler.ServeHTTP(w, r)
 		case BackrestDoRepoTaskProcedure:
@@ -679,6 +703,10 @@ func (UnimplementedBackrestHandler) ListSnapshots(context.Context, *connect.Requ
 
 func (UnimplementedBackrestHandler) ListSnapshotFiles(context.Context, *connect.Request[v1.ListSnapshotFilesRequest]) (*connect.Response[v1.ListSnapshotFilesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("v1.Backrest.ListSnapshotFiles is not implemented"))
+}
+
+func (UnimplementedBackrestHandler) DiffSnapshots(context.Context, *connect.Request[v1.SnapshotDiffRequest]) (*connect.Response[v1.SnapshotDiffResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("v1.Backrest.DiffSnapshots is not implemented"))
 }
 
 func (UnimplementedBackrestHandler) Backup(context.Context, *connect.Request[v1.BackupRequest]) (*connect.Response[emptypb.Empty], error) {

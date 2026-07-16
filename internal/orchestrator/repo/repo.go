@@ -213,6 +213,22 @@ func (r *RepoOrchestrator) ListSnapshotFiles(ctx context.Context, snapshotId str
 	return lsEnts, nil
 }
 
+func (r *RepoOrchestrator) Diff(ctx context.Context, fromSnapshot string, toSnapshot string) ([]*v1.DiffEntry, error) {
+	ctx, flush := forwardResticLogs(ctx)
+	defer flush()
+
+	entries, err := r.repo.Diff(ctx, fromSnapshot, toSnapshot)
+	if err != nil {
+		return nil, fmt.Errorf("diff snapshots %q -> %q for repo %v: %w", fromSnapshot, toSnapshot, r.repoConfig.Id, err)
+	}
+
+	protoEntries := make([]*v1.DiffEntry, 0, len(entries))
+	for _, entry := range entries {
+		protoEntries = append(protoEntries, &v1.DiffEntry{Path: entry.Path, ChangeType: entry.ChangeType})
+	}
+	return protoEntries, nil
+}
+
 func (r *RepoOrchestrator) Forget(ctx context.Context, policy *v1.RetentionPolicy, opts ...restic.GenericOption) ([]*v1.ResticSnapshot, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
