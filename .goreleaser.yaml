@@ -104,7 +104,7 @@ archives:
 dockers_v2:
   - id: alpine
     images:
-      - "goehrims/backrest"
+      - "mariusgring/backrest"
       - "ghcr.io/goehrims/backrest"
     tags:
       - latest
@@ -130,7 +130,7 @@ dockers_v2:
 
   - id: scratch
     images:
-      - goehrims/backrest
+      - mariusgring/backrest
       - ghcr.io/goehrims/backrest
     tags:
       - scratch
