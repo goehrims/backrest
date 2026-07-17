@@ -104,8 +104,8 @@ archives:
 dockers_v2:
   - id: alpine
     images:
-      - "garethgeorge/backrest"
-      - "ghcr.io/garethgeorge/backrest"
+      - "goehrims/backrest"
+      - "ghcr.io/goehrims/backrest"
     tags:
       - latest
       - latest-alpine
@@ -130,8 +130,8 @@ dockers_v2:
 
   - id: scratch
     images:
-      - garethgeorge/backrest
-      - ghcr.io/garethgeorge/backrest
+      - goehrims/backrest
+      - ghcr.io/goehrims/backrest
     tags:
       - scratch
       - v{{ .Major }}-scratch
@@ -152,30 +152,6 @@ dockers_v2:
       - linux/arm/v7
       - linux/386
 
-brews:
-  - name: backrest
-    ids:
-      - default
-    homepage: https://github.com/garethgeorge/backrest
-    description: "Backrest is a web UI and orchestrator for restic backup."
-
-    url_template: "https://github.com/garethgeorge/backrest/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-
-    commit_author:
-      name: goreleaserbot
-      email: bot@goreleaser.com
-
-    repository:
-      owner: garethgeorge
-      name: homebrew-backrest-tap
-      branch: main
-      token: "{{ .Env.HOMEBREW_GITHUB_TOKEN }}"
-
-    service: |
-      run opt_bin/"backrest"
-      error_log_path var/"log/backrest.log"
-      log_path var/"log/backrest.log"
-
 changelog:
   sort: asc
   filters:
@@ -185,5 +161,5 @@ changelog:
 
 release:
   github:
-    owner: garethgeorge
+    owner: goehrims
     name: backrest
